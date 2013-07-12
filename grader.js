@@ -22,10 +22,13 @@ References:
 */
 
 var fs = require('fs');
+var util = require('util');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+
+var urlfile = "urlfile.html";
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -61,14 +64,60 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var rest = require('restler');
+/*
+var buildfn = function(checks){
+    var checkURLFile = function(result, response){
+        if (result instanceof Error) {
+            console.error('Error: ' + util.format(response.message));
+        } else {
+            console.log("Writing %s\n", urlfile); 
+            fs.writeFileSync(urlfile, result);
+            return checkHtmlFile(urlfile,checks);
+        }
+    };
+    return checkURLFile;
+};
+*/
+
+var checkURLFile = function(url,checks){
+    console.log('url->' + url);
+    rest.get(url).on('complete', function(result, response){
+        console.log('here');
+        if (result instanceof Error) {
+            console.error('Error: ' + util.format(response.message));
+        } else {
+            console.log("Writing %s\n", urlfile);
+            fs.writeFileSync(urlfile, result);
+            checkJson = checkHtmlFile(urlfile,checks);
+            outJson2console(checkJson); 
+        }
+    });
+
+};
+
+var outJson2console = function(checkJson){
+    var outJson = JSON.stringify(checkJson, null, 4);
+    console.log(outJson);
+}; 
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('--url <url_file>', 'Path to url')
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    var checkJson = {};
+
+    if (program.url){
+/*
+        var checkURLFile = buildfn(program.checks);
+        checkJson = rest.get(program.url).on('complete', checkURLFile);	
+*/
+        checkJson = checkURLFile(program.url, program.checks);
+    } else {
+        checkJson = checkHtmlFile(program.file, program.checks);
+        outJson2console(checkJson);
+    }
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
